@@ -4,11 +4,12 @@ mod models;
 mod routes;
 mod state;
 
-use tracing_subscriber::fmt::init;
+use tracing_subscriber::{EnvFilter, fmt};
 
 #[tokio::main]
 async fn main() {
-    init();
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    fmt().with_env_filter(filter).init();
 
     let state = state::AppState::new();
     let app = app::create_app(state);
