@@ -38,7 +38,11 @@ pub async fn create_todo(
         updated_at: now,
     };
 
-    state.todos.lock().unwrap().insert(todo.id, todo.clone());
+    let mut todos = state
+        .todos
+        .lock()
+        .map_err(|_| AppError::Internal("mutex poisoned".into()))?;
+    todos.insert(todo.id, todo.clone());
 
     Ok(Json(todo))
 }
