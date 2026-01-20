@@ -10,11 +10,35 @@ use crate::{
     models::todo::{Priority, Todo, TodoSource, TodoStatus},
     state::AppState,
 };
+use validator::Validate;
 
-#[derive(serde::Deserialize)]
+use validator::ValidationErrors;
+
+fn validation_error(err: ValidationErrors) -> AppError {
+    let messages = err
+        .field_errors()
+        .iter()
+        .map(|(field, errors)| {
+            let msgs: Vec<_> = errors
+                .iter()
+                .filter_map(|e| e.message.as_ref())
+                .map(|m| m.to_string())
+                .collect();
+            (field.to_string(), msgs)
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+
+    AppError::BadRequest(serde_json::to_string(&messages).unwrap())
+}
+
+#[derive(serde::Deserialize, Validate)]
 pub struct CreateTodo {
+    #[validate(length(min = 1, message = "title cannot be empty"))]
     pub title: String,
+
+    #[validate(length(max = 500))]
     pub description: Option<String>,
+
     pub priority: Option<Priority>,
 }
 
@@ -22,9 +46,7 @@ pub async fn create_todo(
     State(state): State<AppState>,
     Json(payload): Json<CreateTodo>,
 ) -> Result<Json<Todo>, AppError> {
-    if payload.title.trim().is_empty() {
-        return Err(AppError::BadRequest("title cannot be empty".into()));
-    }
+    payload.validate().map_err(validation_error)?;
 
     let now = Utc::now();
     let todo = Todo {
@@ -68,10 +90,14 @@ pub async fn get_todo(
     Ok(Json(todo))
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Validate)]
 pub struct UpdateTodo {
+    #[validate(length(min = 1))]
     pub title: Option<String>,
+
+    #[validate(length(max = 500))]
     pub description: Option<String>,
+
     pub status: Option<TodoStatus>,
     pub priority: Option<Priority>,
 }
@@ -81,6 +107,10 @@ pub async fn update_todo(
     State(state): State<AppState>,
     Json(payload): Json<UpdateTodo>,
 ) -> Result<Json<Todo>, AppError> {
+    payload
+        .validate()
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+
     let mut todos = state.todos.lock().unwrap();
     let todo = todos.get_mut(&id).ok_or(AppError::NotFound)?;
 
