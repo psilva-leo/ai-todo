@@ -3,6 +3,7 @@ mod error;
 mod models;
 mod routes;
 mod state;
+mod validator;
 
 use tracing_subscriber::{EnvFilter, fmt};
 
