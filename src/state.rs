@@ -1,18 +1,12 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use uuid::Uuid;
-
-use crate::models::todo::Todo;
+use sqlx::PgPool;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub todos: Arc<Mutex<HashMap<Uuid, Todo>>>,
+    pub pool: PgPool,
 }
 
 impl AppState {
-    pub fn new() -> Self {
-        Self {
-            todos: Arc::new(Mutex::new(HashMap::new())),
-        }
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
     }
 }

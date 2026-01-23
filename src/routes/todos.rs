@@ -29,7 +29,7 @@ pub async fn create_todo(
     ValidatedJson(payload): ValidatedJson<CreateTodo>,
 ) -> Result<Json<Todo>, AppError> {
     let now = Utc::now();
-    let todo = Todo {
+    let new_todo = Todo {
         id: Uuid::new_v4(),
         title: payload.title,
         description: payload.description,
@@ -40,32 +40,70 @@ pub async fn create_todo(
         updated_at: now,
     };
 
-    let mut todos = state
-        .todos
-        .lock()
-        .map_err(|_| AppError::Internal("mutex poisoned".into()))?;
-    todos.insert(todo.id, todo.clone());
+    let todo = sqlx::query_as!(
+        Todo,
+        r#"
+        INSERT INTO todos (id, title, description, status, priority, source, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, title, description, status, priority, source, created_at, updated_at
+        "#,
+        new_todo.id,
+        new_todo.title,
+        new_todo.description,
+        new_todo.status.to_string(),
+        new_todo.priority.to_string(),
+        new_todo.source.to_string(),
+        new_todo.created_at,
+        new_todo.updated_at
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to create todo: {:?}", e);
+        AppError::Internal("failed to create todo".into())
+    })?;
 
     Ok(Json(todo))
 }
 
-pub async fn list_todos(State(state): State<AppState>) -> Json<Vec<Todo>> {
-    let todos = state.todos.lock().unwrap().values().cloned().collect();
+pub async fn list_todos(State(state): State<AppState>) -> Result<Json<Vec<Todo>>, AppError> {
+    let todos = sqlx::query_as!(
+        Todo,
+        r#"
+        SELECT id, title, description, status, priority, source, created_at, updated_at
+        FROM todos
+        ORDER BY created_at DESC
+        "#
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to list todos: {:?}", e);
+        AppError::Internal("failed to list todos".into())
+    })?;
 
-    Json(todos)
+    Ok(Json(todos))
 }
 
 pub async fn get_todo(
     Path(id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<Todo>, AppError> {
-    let todo = state
-        .todos
-        .lock()
-        .unwrap()
-        .get(&id)
-        .cloned()
-        .ok_or(AppError::NotFound)?;
+    let todo = sqlx::query_as!(
+        Todo,
+        r#"
+        SELECT id, title, description, status, priority, source, created_at, updated_at
+        FROM todos WHERE id = $1
+        "#,
+        id
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to get todo: {:?}", e);
+        AppError::Internal("failed to get todo".into())
+    })?
+    .ok_or(AppError::NotFound)?;
 
     Ok(Json(todo))
 }
@@ -87,8 +125,19 @@ pub async fn update_todo(
     State(state): State<AppState>,
     ValidatedJson(payload): ValidatedJson<UpdateTodo>,
 ) -> Result<Json<Todo>, AppError> {
-    let mut todos = state.todos.lock().unwrap();
-    let todo = todos.get_mut(&id).ok_or(AppError::NotFound)?;
+    // Fetch first to apply partial updates
+    let mut todo = sqlx::query_as!(
+        Todo,
+        "SELECT id, title, description, status, priority, source, created_at, updated_at FROM todos WHERE id = $1",
+        id
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to fetch todo for update: {:?}", e);
+        AppError::Internal("failed to fetch todo".into())
+    })?
+    .ok_or(AppError::NotFound)?;
 
     if let Some(title) = payload.title {
         todo.title = title;
@@ -105,15 +154,44 @@ pub async fn update_todo(
 
     todo.updated_at = Utc::now();
 
-    Ok(Json(todo.clone()))
+    let updated_todo = sqlx::query_as!(
+        Todo,
+        r#"
+        UPDATE todos 
+        SET title = $1, description = $2, status = $3, priority = $4, updated_at = $5
+        WHERE id = $6
+        RETURNING id, title, description, status, priority, source, created_at, updated_at
+        "#,
+        todo.title,
+        todo.description,
+        todo.status.to_string(),
+        todo.priority.to_string(),
+        todo.updated_at,
+        id
+    )
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to update todo: {:?}", e);
+        AppError::Internal("failed to update todo".into())
+    })?;
+
+    Ok(Json(updated_todo))
 }
 
 pub async fn delete_todo(
     Path(id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<(), AppError> {
-    let removed = state.todos.lock().unwrap().remove(&id);
-    if removed.is_none() {
+    let result = sqlx::query!("DELETE FROM todos WHERE id = $1", id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to delete todo: {:?}", e);
+            AppError::Internal("failed to delete todo".into())
+        })?;
+
+    if result.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
 

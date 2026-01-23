@@ -5,19 +5,45 @@ mod routes;
 mod state;
 mod validator;
 
+use dotenvy::dotenv;
+use sqlx::postgres::PgPoolOptions;
+use std::env;
 use tracing_subscriber::{EnvFilter, fmt};
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
+
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     fmt().with_env_filter(filter).init();
 
-    let state = state::AppState::new();
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("Failed to connect to Postgres");
+
+    // Run migrations if enabled (mostly for local dev)
+    let run_migrations = env::var("RUN_MIGRATIONS").is_ok_and(|v| v == "true");
+
+    if run_migrations {
+        tracing::info!("Running migrations...");
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("Failed to run migrations");
+        tracing::info!("Migrations executed successfully.");
+    }
+
+    let state = state::AppState::new(pool);
     let app = app::create_app(state);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
         .unwrap();
+
+    tracing::info!("Listening on {}", listener.local_addr().unwrap());
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
