@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PORT=3000
+PORT=5000
 
 # Check if lsof is installed
 if ! command -v lsof &> /dev/null; then

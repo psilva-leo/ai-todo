@@ -12,7 +12,7 @@ chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-tower-http = { version = "0.6.8", features = ["trace"] }
+tower-http = { version = "0.6.1", features = ["trace", "cors"] }
 validator = { version = "0.20.0", features = ["derive"] }
 serde_json = "1.0.149"
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio", "tls-native-tls", "macros", "chrono", "uuid"] }
