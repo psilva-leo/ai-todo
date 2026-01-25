@@ -2,6 +2,7 @@ mod app;
 mod error;
 mod models;
 mod routes;
+mod services;
 mod state;
 mod validator;
 
@@ -36,7 +37,9 @@ async fn main() {
         tracing::info!("Migrations executed successfully.");
     }
 
-    let state = state::AppState::new(pool);
+    let gemini =
+        services::gemini::GeminiService::new().expect("Failed to initialize GeminiService");
+    let state = state::AppState::new(pool, gemini);
     let app = app::create_app(state);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")

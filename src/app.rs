@@ -14,6 +14,8 @@ pub fn create_app(state: AppState) -> Router {
         .route("/todos/:id", get(routes::todos::get_todo))
         .route("/todos/:id", patch(routes::todos::update_todo))
         .route("/todos/:id", delete(routes::todos::delete_todo))
+        .route("/audio/suggest", post(routes::audio::suggest_tasks))
+        .route("/audio/confirm", post(routes::audio::confirm_tasks))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
