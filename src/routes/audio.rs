@@ -8,12 +8,12 @@ use crate::{error::AppError, state::AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct ConfirmTasksRequest {
-    pub tasks: Vec<String>,
+    pub tasks: Vec<crate::models::todo::SuggestedTodo>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SuggestedTasksResponse {
-    pub tasks: Vec<String>,
+    pub tasks: Vec<crate::models::todo::SuggestedTodo>,
 }
 
 pub async fn suggest_tasks(
@@ -52,18 +52,19 @@ pub async fn confirm_tasks(
     State(state): State<AppState>,
     Json(req): Json<ConfirmTasksRequest>,
 ) -> Result<StatusCode, AppError> {
-    for task_title in req.tasks {
+    for suggested in req.tasks {
         let id = uuid::Uuid::new_v4();
         let now = chrono::Utc::now();
 
         let status = crate::models::todo::TodoStatus::Todo.to_string();
-        let priority = crate::models::todo::Priority::Medium.to_string();
+        let priority = suggested.priority.to_string();
         let source = crate::models::todo::TodoSource::Audio.to_string();
 
         sqlx::query!(
-            "INSERT INTO todos (id, title, status, priority, source, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            "INSERT INTO todos (id, title, description, status, priority, source, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
             id,
-            task_title,
+            suggested.title,
+            suggested.description,
             status,
             priority,
             source,

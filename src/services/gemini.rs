@@ -23,7 +23,7 @@ impl GeminiService {
         &self,
         audio_data: Vec<u8>,
         mime_type: &str,
-    ) -> Result<Vec<String>, AppError> {
+    ) -> Result<Vec<crate::models::todo::SuggestedTodo>, AppError> {
         let url = format!(
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
             self.api_key
@@ -34,7 +34,7 @@ impl GeminiService {
         let payload = json!({
             "contents": [{
                 "parts": [
-                    {"text": "Extract a list of actionable tasks from this audio. Return ONLY a JSON array of strings with the task titles. No other text, no markdown code blocks."},
+                    {"text": "Extract a list of actionable tasks from this audio. Return ONLY a JSON array of objects. Each object MUST have 'title' (string), 'description' (string or null), and 'priority' (string: 'Low', 'Medium', or 'High'). No other text, no markdown code blocks."},
                     {
                         "inline_data": {
                             "mime_type": mime_type,
@@ -72,11 +72,12 @@ impl GeminiService {
                 AppError::Internal("Unexpected Gemini response structure".to_string())
             })?;
 
-        let tasks: Vec<String> = serde_json::from_str(text).map_err(|e| {
-            AppError::Internal(format!(
-                "Failed to parse tasks from Gemini: {e}. Text was: {text}"
-            ))
-        })?;
+        let tasks: Vec<crate::models::todo::SuggestedTodo> =
+            serde_json::from_str(text).map_err(|e| {
+                AppError::Internal(format!(
+                    "Failed to parse tasks from Gemini: {e}. Text was: {text}"
+                ))
+            })?;
 
         Ok(tasks)
     }

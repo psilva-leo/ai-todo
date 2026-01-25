@@ -196,7 +196,18 @@ Analyzes an audio file using **Gemini 2.5 Flash** to suggest potential tasks.
 **Response:** `200 OK`
 ```json
 {
-  "tasks": ["Buy milk", "Call the dentist", "Finish the report"]
+  "tasks": [
+    {
+      "title": "Buy milk",
+      "description": "2% or whole milk",
+      "priority": "Medium"
+    },
+    {
+      "title": "Call the dentist",
+      "description": "Schedule a cleaning",
+      "priority": "High"
+    }
+  ]
 }
 ```
 
@@ -210,12 +221,18 @@ Analyzes an audio file using **Gemini 2.5 Flash** to suggest potential tasks.
 
 **POST** `/audio/confirm`
 
-Creates multiple todo items from a list of suggested task titles.
+Creates multiple todo items from a list of suggested task objects.
 
 **Request Body:**
 ```json
 {
-  "tasks": ["Buy milk", "Call the dentist"]
+  "tasks": [
+    {
+      "title": "Buy milk",
+      "description": "2% or whole milk",
+      "priority": "Medium"
+    }
+  ]
 }
 ```
 

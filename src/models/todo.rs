@@ -126,3 +126,9 @@ impl From<String> for TodoSource {
         s.parse().unwrap_or(TodoSource::Manual)
     }
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuggestedTodo {
+    pub title: String,
+    pub description: Option<String>,
+    pub priority: Priority,
+}
